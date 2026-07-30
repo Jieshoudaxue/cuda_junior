@@ -3,14 +3,36 @@
 // 这个核函数由 <<<1, block_size>>> 启动，
 // grid_size 是整数 1, 则 gridDim.x = 1, gridDim.y = 1, gridDim.z = 1
 // block_size 是 dim3 结构体变量，blockDim.x = 2, blockDim.y = 4, blockDim.z = 1
+// 因此，线程总数是 grid_size * block_size = 1 * (2 * 4 * 1) = 8 个线程
 // 内建变量 blockIdx 和 threadIdx 是 uint3 结构体类型的变量，也具有 x, y, z 三个成员，
 // blockIdx 是线程块的索引，三个成员的范围是 [0, gridDim.x - 1], [0, gridDim.y - 1], [0, gridDim.z - 1]
 // threadIdx 是线程的索引，三个成员的范围是 [0, blockDim.x - 1], [0, blockDim.y - 1], [0, blockDim.z - 1]
 __global__ void hello_from_gpu() {
+    // block 的索引
     const int bx = blockIdx.x;
+    // block 内的线程局部坐标
     const int tx = threadIdx.x;
     const int ty = threadIdx.y;
     printf("hello world from block: %d and thread: (%d, %d)!\n", bx, tx, ty);
+
+    // 类似 C 语言的二维数组，CUDA 的线程在硬件上也是一维的连续排列，多维只是一种逻辑上的便利，
+    // 因此，CUDA 线程在 block 内的局部索引也可以用线性化的一维方式表示，计算公式如下：
+    const int linear_tid = threadIdx.z * blockDim.x * blockDim.y + threadIdx.y * blockDim.x + threadIdx.x;
+    printf("linear_tid: %d\n", linear_tid);
+
+    // 同上，block 在 grid 内的索引也可以用线性化的一维方式表示，计算公式如下：
+    const int linear_bid = blockIdx.z * gridDim.x * gridDim.y + blockIdx.y * gridDim.x + blockIdx.x;
+
+    // grid 内的线程全局坐标
+    const int global_tx = blockDim.x * blockIdx.x + threadIdx.x;
+    const int global_ty = blockDim.y * blockIdx.y + threadIdx.y;
+    const int global_tz = blockDim.z * blockIdx.z + threadIdx.z;
+    printf("global thread coordinate: (%d, %d, %d)\n", global_tx, global_ty, global_tz);
+
+    //计算线程在整个 Grid 中的一维全局索引
+    const int threadsPerBlock = blockDim.x * blockDim.y * blockDim.z;
+    const int global_linear_tid = linear_bid * threadsPerBlock + linear_tid;
+    printf("global_linear_tid: %d\n", global_linear_tid);
 }
 
 
