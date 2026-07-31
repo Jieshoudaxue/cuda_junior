@@ -33,6 +33,13 @@ __global__ void hello_from_gpu() {
     const int threadsPerBlock = blockDim.x * blockDim.y * blockDim.z;
     const int global_linear_tid = linear_bid * threadsPerBlock + linear_tid;
     printf("global_linear_tid: %d\n", global_linear_tid);
+
+    // 一个 block 内的线程可以进一步细分为多个 thread warp，即线程束，
+    // cpu 的最小调度单位是线程，而 GPU 的最小调度单位是线程束，
+    // 线程束中的线程按照 SIMT (single instruction, multiple thread) 的方式同时执行相同的指令，
+    // 每个线程束包含固定 32 个线程，warpSize 是一个内建变量，表示线程束的大小，永远为 32 。
+    // 对于这个样例，总线程为 8 个线程，所以只有一个线程束，其中 8 个活跃，24 个非活跃，只是占位。
+    printf("warpSize: %d\n", warpSize);
 }
 
 
@@ -47,17 +54,5 @@ int main() {
     const dim3 block_size(2, 4);
     hello_from_gpu<<<1, block_size>>>();
     cudaDeviceSynchronize();
-
-
-    // cudaDeviceProp prop;
-    // cudaGetDeviceProperties(&prop, 0);
-
-    // printf("最大线程数/线程块: %d\n", prop.maxThreadsPerBlock);
-    // printf("线程块各维度上限 (x, y, z): (%d, %d, %d)\n",
-    //        prop.maxThreadsDim[0], prop.maxThreadsDim[1], prop.maxThreadsDim[2]);
-    // printf("网格各维度上限 (x, y, z): (%d, %d, %d)\n",
-    //        prop.maxGridSize[0], prop.maxGridSize[1], prop.maxGridSize[2]);
-    // printf("每个线程块最大共享内存: %zu 字节\n", prop.sharedMemPerBlock);
-
     return 0;
 }
