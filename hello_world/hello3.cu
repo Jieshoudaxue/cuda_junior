@@ -16,8 +16,6 @@ __global__ void hello_from_gpu() {
 int main() {
     // 这里的 <<<2, 4>>> 表示启动两个线程块，每个线程块中有四个线程，共有 2 * 4 = 8 个线程。
     // 这 8 个线程并发执行同样的 CUDA 核函数，即 “单指令-多线程”，（single instruction, multiple thread，SIMT）
-    // 在 SIMT 范式中，线程束内的所有线程执行相同的内核代码，但每个线程可能遵循代码中的不同分支。
-    // 也就是说，尽管程序的所有线程执行相同的代码，但线程不需要遵循相同的执行路径。
     hello_from_gpu<<<2, 4>>>();
     cudaDeviceSynchronize();
     return 0;

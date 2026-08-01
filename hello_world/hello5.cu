@@ -1,8 +1,7 @@
 #include <cstdio>
 #include <stdint.h>
 
-
-// 这个样例讨论网格和线程块的最大尺寸，
+// 这个样例讨论网格和线程块的最大尺寸
 int main() {
     cudaDeviceProp prop;
     cudaGetDeviceProperties(&prop, 0);

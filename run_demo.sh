@@ -60,6 +60,17 @@ if ! command -v "$compiler" >/dev/null 2>&1; then
   exit 5
 fi
 
+# 当使用 nvcc 编译器编译 CUDA 程序时，nvcc 会将 .cu 文件分为两部分，一部分是主机端（CPU）代码，另一部分是设备端（GPU）代码。
+# nvcc 会调用 gcc/g++ 编译主机代码，设备代码由 nvcc 编译器编译，最终将两部分代码链接成一个可执行程序。
+# nvcc 在编译设备代码时，会将设备代码编译成 PTX（Parallel Thread Execution）汇编代码，PTX 是 NVIDIA GPU 的中间表示语言，类似于 CPU 的汇编语言。
+# 然后 nvcc 再将 PTX 代码编译成二进制的 cubin 目标代码。
+# 通常情况下，使用 nvcc 编译 CUDA 程序时，需要指定目标 GPU 的 CC 版本（Compute Capability），
+# 例如 -arch=sm_75 表示编译针对 CC 7.5 的 GPU 架构，-arch=sm_86 表示编译针对 CC 8.6 的 GPU 架构。
+# 但这里没有指定 -arch 参数，nvcc 会默认使用当前系统中安装的 CUDA 工具包的默认架构进行编译。
+echo "compile cmd: "
+echo "$compiler ${compiler_args[*]} -o $exe $src $@"
+echo "--------------------"
+
 if ! "$compiler" "${compiler_args[@]}" -o "$exe" "$src" "$@"; then
   echo "Compilation failed." >&2
   exit 4
