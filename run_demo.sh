@@ -39,7 +39,7 @@ case "$src" in
     ;;
   *.cu)
     compiler="nvcc"
-    compiler_args=("-O2")
+    compiler_args=("-arch=sm_75")
     ;;
   *)
     echo "Error: unsupported source extension. Use .c, .cc, .cpp, .cxx, or .cu." >&2
@@ -66,8 +66,9 @@ fi
 # 然后 nvcc 再将 PTX 代码编译成二进制的 cubin 目标代码。
 # 通常情况下，使用 nvcc 编译 CUDA 程序时，需要指定目标 GPU 的 CC 版本（Compute Capability），
 # 例如 -arch=sm_75 表示编译针对 CC 7.5 的 GPU 架构，-arch=sm_86 表示编译针对 CC 8.6 的 GPU 架构。
-# 但这里没有指定 -arch 参数，nvcc 会默认使用当前系统中安装的 CUDA 工具包的默认架构进行编译。
-echo "compile cmd: "
+# 我的 GPU NVIDIA GeForce MX450, CC 为 7.5，所以在编译时使用 -arch=sm_75 参数。
+# 如果不指定 -arch 参数，nvcc 会使用默认的 CC 版本进行编译，CUDA 11.4 默认的 CC 版本为 5.3
+echo "--------------------"
 echo "$compiler ${compiler_args[*]} -o $exe $src $@"
 echo "--------------------"
 

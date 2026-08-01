@@ -13,6 +13,8 @@ __device__ void hello_from_gpu_inner() {
 
 // __global__ 是一个 CUDA 的关键字，他表明这个函数是一个 CUDA 核函数（kernel function），
 // 由设备端（GPU）执行，由主机端（CPU）调用。
+// 注意：由 __global__ 修饰的函数必须是 void 类型的函数，不能有返回值。
+// 而由 __device__ 修饰的函数可以有返回值。
 __global__ void hello_from_gpu() {
     hello_from_gpu_inner();
 }
