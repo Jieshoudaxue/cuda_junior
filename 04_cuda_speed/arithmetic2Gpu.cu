@@ -9,6 +9,7 @@ typedef double real;
 
 const int NUM_REPEATS = 10;
 const real x_flag = 100.0;
+const real a = 1.23;
 
 __global__ void arithmetic(real *x, const real x_flag, const int N) {
     const int tid = blockDim.x * blockIdx.x + threadIdx.x;
@@ -26,6 +27,7 @@ int main(void) {
     const int M = sizeof(real) * N;
 
     real *h_px = (real*)malloc(M);
+
     real *d_px;
     cudaMalloc((void **)&d_px, M);
 
@@ -44,6 +46,9 @@ int main(void) {
         CHECK_CUDA_CALL(cudaEventRecord(start));
         cudaEventQuery(start);
 
+        for (int i = 0; i < N; ++i) {
+            h_px[i] = a;
+        }
         cudaMemcpy(d_px, h_px, M, cudaMemcpyHostToDevice);
         arithmetic<<<grid_size, block_size>>>(d_px, x_flag, N);
         cudaMemcpy(h_px, d_px, M, cudaMemcpyDeviceToHost);

@@ -9,6 +9,7 @@ typedef double real;
 
 const int NUM_REPEATS = 10;
 const real x_flag = 100.0;
+const real a = 1.23;
 
 void arithmetic(real *x, const real x_flag, const int N) {
     for (int i = 0; i < N; ++i) {
@@ -33,6 +34,10 @@ int main(void) {
     float t2_sum = 0;
     // 循环 11 次，第一次用于预热，不参与计算，后面 10 次用于计时
     for (int repeat = 0; repeat <= NUM_REPEATS; ++repeat) {
+        for (int i = 0; i < N; ++i) {
+            x[i] = a;
+        }
+
         cudaEvent_t start, stop;
         CHECK_CUDA_CALL(cudaEventCreate(&start));
         CHECK_CUDA_CALL(cudaEventCreate(&stop));
