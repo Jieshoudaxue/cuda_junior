@@ -4,8 +4,8 @@
 
 #include "cuda_error.cuh"
 
-typedef double real;
-// typedef float real;
+// typedef double real;
+typedef float real;
 
 const int NUM_REPEATS = 10;
 const real x_flag = 100.0;
@@ -40,15 +40,16 @@ int main(void) {
     float t2_sum = 0;
     // 循环 11 次，第一次用于预热，不参与计算，后面 10 次用于计时
     for (int repeat = 0; repeat <= NUM_REPEATS; ++repeat) {
+        for (int i = 0; i < N; ++i) {
+            h_px[i] = a;
+        }
+
         cudaEvent_t start, stop;
         CHECK_CUDA_CALL(cudaEventCreate(&start));
         CHECK_CUDA_CALL(cudaEventCreate(&stop));
         CHECK_CUDA_CALL(cudaEventRecord(start));
         cudaEventQuery(start);
 
-        for (int i = 0; i < N; ++i) {
-            h_px[i] = a;
-        }
         cudaMemcpy(d_px, h_px, M, cudaMemcpyHostToDevice);
         arithmetic<<<grid_size, block_size>>>(d_px, x_flag, N);
         cudaMemcpy(h_px, d_px, M, cudaMemcpyDeviceToHost);

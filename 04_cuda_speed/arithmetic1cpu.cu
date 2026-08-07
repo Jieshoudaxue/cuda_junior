@@ -4,8 +4,8 @@
 
 #include "cuda_error.cuh"
 
-typedef double real;
-// typedef float real;
+// typedef double real;
+typedef float real;
 
 const int NUM_REPEATS = 10;
 const real x_flag = 100.0;
