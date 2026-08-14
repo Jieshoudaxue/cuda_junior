@@ -10,7 +10,7 @@ __device__ int d_x = 1;
 __device__ int d_y[2];
 
 __global__ void my_kernel(void) {
-    // 在核函数中，可直接对静态全局内存变量进行访问，就像 C++ 中的全家变量
+    // 在核函数中，可直接对静态全局内存变量进行访问，可读可写，就像 C++ 中的全家变量
     d_y[0] += d_x;
     d_y[1] += d_x;
     printf("d_x = %d, d_y[0] = %d, d_y[1] = %d\n", d_x, d_y[0], d_y[1]);
