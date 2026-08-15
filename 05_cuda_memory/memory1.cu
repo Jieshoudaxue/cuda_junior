@@ -48,10 +48,10 @@ int main(void) {
         h_py[i] = b;
     }
 
-    // 这里使用 cudaMalloc 申请的三个内存，就是全局内存，global memmory，
-    // 全局内存的作用域是整个网格，生命周期是整个应用程序（由主机分配和释放），位置在 GPU 设备，但位于片外，可读可写。
+    // 全局内存（global memmory）的作用域是整个网格，生命周期是整个应用程序（由主机分配和释放），位置在 GPU 设备，但位于片外，可读可写。
     // 全局内存的访问速度不快，但容量最大，基本就是显存的大小，
-    // 类比： CUDA 的全家内存不是 C++ 中的全局变量所在的全局数据区，更类似 C++ 中的堆内存
+    // 类比： CUDA 的全家内存不是 C++ 中的全局变量所在的全局数据区，更类似 C++ 中的堆内存。
+    // 这里使用 cudaMalloc 申请的三个内存，就是全局内存
     double *d_px, *d_py, *d_pz;
     CHECK_CUDA_CALL(cudaMalloc((void **)&d_px, M));
     CHECK_CUDA_CALL(cudaMalloc((void **)&d_py, M));
