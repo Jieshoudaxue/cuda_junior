@@ -11,7 +11,7 @@ __global__ void copy(const real *A, real *B, const int N) {
     const int ix = blockIdx.x * TILE_DIM + threadIdx.x;
     const int iy = blockIdx.y * TILE_DIM + threadIdx.y;
     if (ix < N && iy < N) {
-        B[ix * N + iy] = A[ix * N + iy];
+        B[iy * N + ix] = A[iy * N + ix];
     }
 }
 
@@ -28,14 +28,6 @@ __global__ void transpose2(const real *A, real *B, const int N) {
     const int iy = blockIdx.y * blockDim.y + threadIdx.y;
     if (ix < N && iy < N) {
         B[iy * N + ix] = A[ix * N + iy];
-    }
-}
-
-__global__ void transpose3(const real *A, real *B, const int N) {
-    const int ix = blockIdx.x * blockDim.x + threadIdx.x;
-    const int iy = blockIdx.y * blockDim.y + threadIdx.y;
-    if (ix < N && iy < N) {
-        B[iy * N + ix] = __ldg(&A[ix * N + iy]);
     }
 }
 
@@ -63,9 +55,6 @@ void timing(const real *d_A, real *d_B, const int N, const int task) {
                 break;
             case 2:
                 transpose2<<<grid_size, block_size>>>(d_A, d_B, N);
-                break;
-            case 3:
-                transpose3<<<grid_size, block_size>>>(d_A, d_B, N);
                 break;
             default:
                 printf("Error: wrong task\n");
@@ -103,7 +92,7 @@ void print_matrix(const int N, const real *A) {
 }
 
 int main(void) {
-    const int N = 4;
+    const int N = 128;
     const int N2 = N * N;
     const int M = sizeof(real) * N2;
 
@@ -127,11 +116,8 @@ int main(void) {
     printf("\ntranspose with coalesced write: \n");
     timing(d_A, d_B, N, 2);
 
-    printf("\ntranspose with coalesced write and __ldg read: \n");
-    timing(d_A, d_B, N, 3);
-
     CHECK_CUDA_CALL(cudaMemcpy(h_B, d_B, M, cudaMemcpyDeviceToHost));
-    if (N <= 10) {
+    if (N <= 8) {
         printf("\nA = \n");
         print_matrix(N, h_A);
         printf("\nB = \n");
