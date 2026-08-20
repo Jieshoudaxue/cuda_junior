@@ -2,8 +2,8 @@
 
 #include "cuda_error.cuh"
 
-typedef float real;
-// typedef double real;
+// typedef float real;
+typedef double real;
 
 const int NUM_REPEATS = 20;
 
