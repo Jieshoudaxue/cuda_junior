@@ -5,7 +5,7 @@
 typedef float real;
 // typedef double real;
 
-const int NUM_REPEATS = 100;
+const int NUM_REPEATS = 20;
 const int N = 1e8;
 const int M = sizeof(real) * N;
 const int BLOCK_SIZE = 128;
@@ -33,7 +33,7 @@ __global__ void reduce_shared(real *d_x, real *d_y) {
     const int n = bid * blockDim.x + tid;
     __shared__ real s_y[128];
     s_y[tid] = (n < N) ? d_x[n] : 0.0;
-    __syncthreads;
+    __syncthreads();
 
     for (int offset = blockDim.x >> 1; offset > 0; offset >>= 1) {
         if (tid < offset) {
@@ -82,8 +82,8 @@ real reduce(real *d_x, const int method) {
         case 1:
             reduce_shared<<<grid_size, BLOCK_SIZE>>>(d_x, d_y);
             break;
-        case 1:
-            reduce_dynamic<<<grid_size, BLOCK_SIZE>>>(d_x, d_y);
+        case 2:
+            reduce_dynamic<<<grid_size, BLOCK_SIZE, smem>>>(d_x, d_y);
             break;
         default:
             printf("Error: wrong method\n");
@@ -94,8 +94,8 @@ real reduce(real *d_x, const int method) {
     CHECK_CUDA_CALL(cudaMemcpy(h_y, d_y, ymem, cudaMemcpyDeviceToHost));
 
     real result = 0.0;
-    for (int i = 0; i < grid_size; ++n) {
-        result += h_y[n];
+    for (int i = 0; i < grid_size; ++i) {
+        result += h_y[i];
     }
 
     free(h_y);
@@ -142,7 +142,7 @@ int main(void) {
     printf("Using global memory only: \n");
     timing(h_x, d_x, 0);
 
-    printf("\nUsing static shared memory: \n"):
+    printf("\nUsing static shared memory: \n");
     timing(h_x, d_x, 1);
 
     printf("\nUsing dynamic shared memory: \n");
