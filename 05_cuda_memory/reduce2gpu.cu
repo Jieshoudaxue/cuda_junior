@@ -1,4 +1,5 @@
 #include <cstdio>
+#include <cstdint>
 
 #include "cuda_error.cuh"
 
@@ -11,11 +12,12 @@ const int M = sizeof(real) * N;
 const int BLOCK_SIZE = 128;
 
 // 这个归约算法称之为折半归约（binary reduction），
-// 他要求数组长度 N 必须被 BLOCK_SIZE 整除，且 BLOCK_SIZE 为 2 的整数次方，比如这里使用的 BLOCK_SIZE 为 128。
 // 具体做法是将数组分为 BLOCK_SIZE 部分，每部分交由一个线程块处理，
 // 对于每个 BLOCK_SIZE 子数组，将后半部分的各个元素与前半部分对应的数组元素相加，重复此过程，最后得到的第一个数组元素就是最初的数组中各个元素的和。
-// 这个过程要求对同一个线程块的线程进行同步，避免数据竞争。
-// 由于不同线程块负责不同的子数组，因此不需要进行线程同步。
+// 这个过程要求对同一个线程块的线程进行同步，避免数据竞争。由于不同线程块负责不同的子数组，因此线程块之间不需要进行线程同步。
+
+// 这个核函数只使用全局内存，
+// 要求数组长度 N 必须被 BLOCK_SIZE 整除，且 BLOCK_SIZE 为 2 的整数次方，比如这里使用的 BLOCK_SIZE 为 128。
 __global__ void reduce_global(real *d_x, real *d_y) {
     const int tid = threadIdx.x;
     // 这句等价于：real *x = &d_x[blockDim.x * blockIdx.x];
@@ -42,15 +44,28 @@ __global__ void reduce_global(real *d_x, real *d_y) {
     }
 }
 
+// 这个核函数使用共享内存优化全局内存访问，并优化 N 必须被 BLOCK_SIZE 整除的限制
+// 他不要求数组长度 N 必须被 BLOCK_SIZE 整除，但 BLOCK_SIZE 必须为 2 的整数次方，比如这里使用的 BLOCK_SIZE 为 128。
+
+// 提示：在我的机器上，reduce_global 和 reduce_shared 性能上并没有明显的区别，
+// 因为使用共享内存本身也有别的开销，比如多一次拷贝，多一些 sync 操作，
+// 一般来说，在核函数中对共享内存访问的次数越多，则使用共享内存带来的加速效果越明显。
 __global__ void reduce_shared(real *d_x, real *d_y) {
     const int tid = threadIdx.x;
-    const int bid = blockIdx.x;
+    const int n = blockIdx.x * blockDim.x + tid;
 
-    const int n = bid * blockDim.x + tid;
+    // 共享内存推荐使用 s_* 前缀，
+    // 下面定义的共享内存数组，会在每一个线程块中保留一份副本，
+    // 虽然数组变量名一致，但每个线程块的副本都不一样，每个线程块操作自己的副本，互不干涉。
     __shared__ real s_y[BLOCK_SIZE];
+    // 这里是将每个线程块负责的子数组数据，从全局数据总拷贝到当前线程块的共享内存中，从而减少对全局内存的访问
+    // 由于这里有 n < N 的限制，超出则用 0.0 占位，所以对于这个函数，不要求数组长度 N 必须被 BLOCK_SIZE 整除
+    // 调用 __syncthreads，确保线程块内的所有线程在操作共享内存之前，数据准备就绪。
     s_y[tid] = (n < N) ? d_x[n] : 0.0;
     __syncthreads();
 
+    // 下面的逻辑同 reduce_global()，唯一的区别是对共享内存里的子数组进行归约，
+    // 归约完成后，拷贝到 d_y 中，后续的逻辑会将 d_y 拷贝到主机端，使用循环完成最后的归约。
     for (int offset = blockDim.x >> 1; offset > 0; offset >>= 1) {
         if (tid < offset) {
             s_y[tid] += s_y[tid + offset];
@@ -59,14 +74,20 @@ __global__ void reduce_shared(real *d_x, real *d_y) {
     }
 
     if (tid == 0) {
-        d_y[bid] = s_y[0];
+        d_y[blockIdx.x] = s_y[0];
     }
 }
 
+// 上面的 reduce_shared 使用的是静态的共享内存，即编译时指定共享内存的大小
+// 这里的核函数使用动态共享内存，当调用核函数时指定共享内存大小。
+// 注意：动态共享内存和静态共享内存没有性能的区别
+// 这里的核函数也不要求数组长度 N 必须被 BLOCK_SIZE 整除，但 BLOCK_SIZE 必须为 2 的整数次方，比如这里使用的 BLOCK_SIZE 为 128。
 __global__ void reduce_dynamic(real *d_x, real *d_y) {
     const int tid = threadIdx.x;
-    const int bid = blockIdx.x;
-    const int n = bid * blockDim.x + tid;
+    const int n = blockIdx.x * blockDim.x + tid;
+
+    // 动态共享内存需要加 extern 关键字，使用 []，里面不填共享内存数组的长度
+    // 调用这个核函数时，由 <<<grid_size, block_size, sizeof(real) * block_size>>> 的第三个参数，指定共享内存大小
     extern __shared__ real s_y[];
     s_y[tid] = (n < N) ? d_x[n] : 0.0;
     __syncthreads();
@@ -79,7 +100,7 @@ __global__ void reduce_dynamic(real *d_x, real *d_y) {
     }
 
     if (tid == 0) {
-        d_y[bid] = s_y[0];
+        d_y[blockIdx.x] = s_y[0];
     }
 }
 
