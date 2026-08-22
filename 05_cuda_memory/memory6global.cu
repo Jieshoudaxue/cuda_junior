@@ -7,6 +7,7 @@ typedef float real;
 const int NUM_REPEATS = 10;
 const int TILE_DIM = 32;
 
+// 这里的矩阵拷贝，读和写都实现了 100% 的合并度，速度最快，时间最短。在我的机器上，单次拷贝平均耗时：0.0068736 ms
 __global__ void copy(const real *A, real *B, const int N) {
     // 核函数是可以直接访问普通全局变量的
     const int ix = blockIdx.x * TILE_DIM + threadIdx.x;
@@ -16,6 +17,7 @@ __global__ void copy(const real *A, real *B, const int N) {
     }
 }
 
+// 这里的矩阵转置，读的时候实现了 100% 的合并度，而写的时候没有实现合并。在我的机器上，单次拷贝平均耗时：0.0213312 ms
 __global__ void transpose1(const real *A, real *B, const int N) {
     const int ix = blockIdx.x * blockDim.x + threadIdx.x;
     const int iy = blockIdx.y * blockDim.y + threadIdx.y;
@@ -23,7 +25,10 @@ __global__ void transpose1(const real *A, real *B, const int N) {
         B[ix * N + iy] = A[iy * N + ix];
     }
 }
-
+    
+// 这里的矩阵转置，读的时候没有实现合并，而写的时候实现了 100% 的合并度，在我的机器上，单次拷贝平均耗时：0.010992 ms
+// 这里的耗时比上面的转置更短，是因为读虽然没有合并，但全局内存的读默认情况下是有缓存机制的，而写是没有的，请读者注意。
+// 因此，在不能同时满足读取和写入都是合并的情况下，一般来说应当尽量做到合并的写入。
 __global__ void transpose2(const real *A, real *B, const int N) {
     const int ix = blockIdx.x * blockDim.x + threadIdx.x;
     const int iy = blockIdx.y * blockDim.y + threadIdx.y;
@@ -115,17 +120,12 @@ int main(void) {
     CHECK_CUDA_CALL(cudaMalloc(&d_B, M));
     CHECK_CUDA_CALL(cudaMemcpy(d_A, h_A, M, cudaMemcpyHostToDevice));
     
-    // 这里的矩阵拷贝，读和写都实现了 100% 的合并度，速度最快，时间最短。在我的机器上，单次拷贝平均耗时：0.0068736 ms
     printf("copy: \n");
     timing(d_A, d_B, N, 0);
 
-    // 这里的矩阵转置，读的时候实现了 100% 的合并度，而写的时候没有实现合并。在我的机器上，单次拷贝平均耗时：0.0213312 ms
     printf("\ntranspose with coalesced read: \n");
     timing(d_A, d_B, N, 1);
-    
-    // 这里的矩阵转置，读的时候没有实现合并，而写的时候实现了 100% 的合并度，在我的机器上，单次拷贝平均耗时：0.010992 ms
-    // 这里的耗时比上面的转置更短，是因为读虽然没有合并，但全局内存的读默认情况下是有缓存机制的，而写是没有的，请读者注意。
-    // 因此，在不能同时满足读取和写入都是合并的情况下，一般来说应当尽量做到合并的写入。
+
     printf("\ntranspose with coalesced write: \n");
     timing(d_A, d_B, N, 2);
 
