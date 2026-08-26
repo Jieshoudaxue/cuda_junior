@@ -13,13 +13,14 @@ __global__ void gpu_touch(uint64_t *px, const size_t data_size) {
 }
 
 int main(void) {
-    for (int i = 1; i <= N; i+=8) {
+    for (int i = 1; i <= N; i++) {
         const size_t mem_size = size_t(i) * 1024 * 1024 * 1024;
         const size_t data_size = mem_size / sizeof(uint64_t);
         
         uint64_t *px;
         // 我的机器的主机内存是 32G，显存是 1.8G。
-        // 在我的机器上，使用统一内存能申请超过 2G 的空间，但无法超过 34G（32G+1.8G）
+        // 在我的机器上，使用统一内存能申请超过 2G 的空间，但无法超过 31G（总量: 32G+1.8G）,
+        // 这里证明了，统一内存能让主机内存参与 gpu 计算，弥补显存容量的不足。
         /*
         CUDA Error: 
         Error code: 700
@@ -35,7 +36,7 @@ int main(void) {
 
 
         CHECK_CUDA_CALL(cudaFree(px));
-        printf("Allocated %d GB unified memory without touch\n", i);
+        printf("Allocated %d GB unified memory with gpu touch\n", i);
     }
 
     return 0;
