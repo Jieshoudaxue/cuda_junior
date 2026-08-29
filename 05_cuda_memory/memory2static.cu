@@ -12,7 +12,7 @@ __device__ int d_x = 1;
 __device__ int d_y[2];
 
 __global__ void my_kernel(void) {
-    // 在核函数中，可直接对静态全局内存变量进行访问，可读可写，就像 C++ 中的全家变量
+    // 在核函数中，可直接对静态全局内存变量进行访问，可读可写，就像 C++ 中的全局变量
     d_y[0] += d_x;
     d_y[1] += d_x;
     printf("d_x = %d, d_y[0] = %d, d_y[1] = %d\n", d_x, d_y[0], d_y[1]);
@@ -22,8 +22,8 @@ int main(void) {
     int h_y[2] = {100, 200};
 
     // 主机代码不能直接访问静态全局内存变量，因为他是属于设备的，
-    // 但可以使用 cudaMemcpyToSymbol 和 cudaMemcpyFromSymbol 在静态全家内存与主机内存间传输数据。
-    // cudaMemcpyToSymbol 用于将主机数据拷贝到静态全家内存中，接口定义：
+    // 但可以使用 cudaMemcpyToSymbol 和 cudaMemcpyFromSymbol 在静态全局内存与主机内存间传输数据。
+    // cudaMemcpyToSymbol 用于将主机数据拷贝到静态全局内存中，接口定义：
     // cudaError_t cudaMemcpyToSymbol(const void* symbol, const void* src, size_t count, size_t offset = 0, cudaMemcpyKind kind = cudaMemcpyHostToDevice);
     // const void* symbol: 静态全局内存变量名
     // const void* src: 主机内存缓冲区指针
@@ -35,7 +35,7 @@ int main(void) {
     my_kernel<<<1, 1>>>();
     CHECK_CUDA_CALL(cudaDeviceSynchronize());
 
-    // cudaMemcpyFromSymbol 用于将静态全家内存数据拷贝到主机内存，接口定义：
+    // cudaMemcpyFromSymbol 用于将静态全局内存数据拷贝到主机内存，接口定义：
     // cudaError_t cudaMemcpyFromSymbol(void* dst, const void* symbol, size_t count, size offset = 0, cudaMemcpyKind kind = cudaMemcpyDeviceToHost);
     // void* dst: 主机内存缓冲区指针
     // const void* symbol: 静态全局内存变量名
