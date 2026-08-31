@@ -9,7 +9,8 @@ const int TILE_DIM = 32;
 
 // 这里的矩阵拷贝，读和写都实现了 100% 的合并度，速度最快，时间最短。在我的机器上，单次拷贝平均耗时：0.0068736 ms
 __global__ void copy(const real *A, real *B, const int N) {
-    // 核函数是可以直接访问普通全局变量的
+    // 核函数是可以直接访问普通全局变量的。
+    // 由于 blockDim.x 和 blockDim.y 等于 TILE_DIM，因此也可以替换为 blockDim.x 和 blockDim.y。
     const int ix = blockIdx.x * TILE_DIM + threadIdx.x;
     const int iy = blockIdx.y * TILE_DIM + threadIdx.y;
     if (ix < N && iy < N) {
