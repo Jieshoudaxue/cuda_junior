@@ -38,7 +38,7 @@ __global__ void reduce(const real *d_x, real *d_y, const int N) {
         atomicAdd(d_y, s_y[0]);
     }
 
-    // 这里我们系统梳理 CUDA 的原子函数，他们都是 __device__ 函数，只能在核函数中时间，所有的原子函数返回值都是原来的值（old value），而不是累加后的值。
+    // 这里我们系统梳理 CUDA 的原子函数，他们都是 __device__ 函数，只能在核函数中使用，所有的原子函数返回值都是原来的值（old value），而不是累加后的值。
     // 1 加法： T atomicAdd(T *address, T val); 功能： new = old + val; 返回值：old
     // 2 减法： T atomicSub(T *address, T val); 功能： new = old - val; 返回值：old
     // 3 交换： T atomicExch(T *address, T val); 功能： new = val; 返回值：old
