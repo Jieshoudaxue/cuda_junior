@@ -6,7 +6,7 @@
 // typedef float real;
 typedef double real;
 
-const int NUM_REPEATS = 100;
+const int NUM_REPEATS = 20;
 const int N = 1e8;
 const int M = sizeof(real) * N;
 const int BLOCK_SIZE = 128;

@@ -17,10 +17,13 @@ __global__ void reduce_syncwarp(const real *d_x, real *d_y) {
     const int tid = threadIdx.x;
     const int n = blockIdx.x * blockDim.x + tid;
 
+    // 这里使用动态共享内存，s_y 的长度是 BLOCK_SIZE,
+    // 下面的语句是将每个线程块负责的子数组数据，从全局数据总拷贝到当前线程块的共享内存中，从而减少对全局内存的访问
     extern __shared__ real s_y[];
     s_y[tid] = (n < N) ? d_x[n] : 0.0;
     __syncthreads();
 
+    // blockDim.x 就是 BLOCK_SIZE，当 offset 大于等于 32 时，下面的执行语句需要在线程块内部进行同步，因此使用 __syncthreads()
     for (int offset = blockDim.x >> 1; offset >= 32; offset >>= 1) {
         if (tid < offset) {
             s_y[tid] += s_y[tid + offset];
@@ -28,10 +31,15 @@ __global__ void reduce_syncwarp(const real *d_x, real *d_y) {
         __syncthreads();
     }
 
+    // 当 offset <= 16 时，下面的执行语句只需要在线程束内（一个线程束固定为 32 个线程）进行同步即可，
+    // 因此使用更加轻量的线程束内部同步函数 __syncwarp()，速度更快
     for (int offset = 16; offset > 0; offset >>= 1) {
         if (tid < offset) {
             s_y[tid] += s_y[tid + offset];
         }
+        // 函数原型： void __syncwarp(unsigned mask = 0xffffffff)
+        // mask 是可选参数，用于控制线程束内哪些线程参与同步，默认值是 32 个 1，即全部参加同步
+        // 如果 mask 是 0xfffffffe ，则 0 号线程不参与同步。
         __syncwarp();
     }
 
