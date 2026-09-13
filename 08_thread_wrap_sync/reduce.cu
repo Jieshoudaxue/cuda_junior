@@ -48,6 +48,7 @@ __global__ void reduce_syncwarp(const real *d_x, real *d_y) {
     }
 }
 
+// 利用线程束洗盘函数，再次优化数组归约
 __global__ void reduce_shfl(const real *d_x, real *d_y) {
     const int tid = threadIdx.x;
     const int n = blockIdx.x * blockDim.x + tid;
@@ -63,7 +64,11 @@ __global__ void reduce_shfl(const real *d_x, real *d_y) {
         __syncthreads();
     }
 
+    // 对于最后线程束要处理的 32 个数据，每一个线程将自己要处理的数组元素拷贝到寄存器中，效率最高
     real y = s_y[tid];
+    // 由于 __shfl_down_sync 的特性，包括向下移动特性，越界返回自身特性，隐式同步特性，
+    // 使得这里完美替代了上面 reduce_syncwarp 中的写法，代码更简单，效率也更高
+    // 下面的写法，可以理解为将 32 长的数组，连续向左平移 16, 8, 4, 2, 1， 每次平移都与当前值累加，最终零号线程的 y 值就是归约的最终结果。
     for (int offset = 16; offset > 0; offset >>= 1) {
         y += __shfl_down_sync(FULL_MASK, y, offset);
     }
