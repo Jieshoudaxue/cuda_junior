@@ -98,7 +98,7 @@ __global__ void test_warp_primitives(void) {
     // T __shfl_xor_sync(unsigned mask, T var, int laneMask, int width = warpSize);
 
     // T __shfl_sync(unsigned mask, T var, int srcLane, int width = warpSize);
-    // __shfl_sync 的作用是从指定范围 [0, width-1] 的某一个线程中读取 var , 并返回给所有参与线程
+    // __shfl_sync 的作用是从指定范围 [0, width-1] 的某一个线程中读取 var , 并返回给所有参与线程，类似广播
     // mask 是线程掩码，表示哪些线程参与洗牌
     // var 是参与线程提供的值
     // srcLane 代表 lane id 范围为 [0, width-1] 内的某一个线程
@@ -154,7 +154,7 @@ __global__ void test_warp_primitives(void) {
     }
 
     // T __shfl_xor_sync(unsigned mask, T var, int laneMask, int width = warpSize);
-    // __shfl_xor_sync 的作用是让指定范围 [0, width-1] 的所有线程，从 srcLane = curLane ^ laneMask 中获取 var 并返回
+    // __shfl_xor_sync 的作用是让指定范围 [0, width-1] 的所有线程，从 srcLane = curLane ^ laneMask 中获取 var 并返回，实际效果是临近的线程两两交互 var。
 
     // 以这里为例，当前核函数共 16 个线程，所以参与表决的线程是 16 个。WIDTH 为 8 ，则将 16 个线程分为两段，分别洗牌。
     // 针对 [0, 7] 线程，则依次从 [1  0  3  2  5  4  7  6] 线程取 var (tid) ，返回给自己。
@@ -170,6 +170,8 @@ __global__ void test_warp_primitives(void) {
     }
 }
 
+// 这里举例讲解 线程束表决函数（warp vote functions） 和 线程束洗牌函数（warp shuffle functions），
+// 他们都以 _sync 结尾，而且都具备隐式的线程束同步功能，能自动处理数据竞争问题
 int main(void) {
     test_warp_primitives<<<1, BLOCK_SIZE>>>();
     CHECK_CUDA_CALL(cudaDeviceSynchronize());
