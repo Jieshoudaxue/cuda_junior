@@ -53,6 +53,9 @@ real reduce(const real *d_x) {
     real *d_y;
     CHECK_CUDA_CALL(cudaMalloc(&d_y, y_mem_size));
 
+    // 这里使用了两次调用同一个核函数实现归约计算，
+    // 第一次调用， GRID_SIZE 是 10240, BLOCK_SIZE 是 128，总线程数小于 N = 1e8，得到 d_y 数组，他的长度是 GRID_SIZE = 10240
+    // 第二次调用，grid_size 是 1, block_size 取最大值 1024, 总线程数小于 d_y 长度 10240，得到新的 d_y 数组，第 0 个元素即为最终结果
     reduce_cooperative_group<<<GRID_SIZE, BLOCK_SIZE, shared_mem_size>>>(d_x, d_y, N);
     reduce_cooperative_group<<<1, 1024, sizeof(real) * 1024>>>(d_y, d_y, GRID_SIZE);
 
@@ -87,6 +90,11 @@ void timing(real *d_x) {
     printf("sum = %f\n", sum);
 }
 
+// 进一步优化归约计算
+// 前面所有的归约实现，grid_size ，block_size 和 数组长度 N 的关系都使用如下计算方法，可以直观理解为，整个网格的线程数等于数组长度。
+// const int grid_size = (N + BLOCK_SIZE - 1) / BLOCK_SIZE;
+// 在折半计算过程中，空闲线程数会越来越多，最后一步只有一个线程在工作，其他 N -1 个线程都是空闲的。过低的线程利用率，导致性能浪费，整体耗时也是增加的。
+// 要提高计算过程的线程利用率，核心是不使用那么多线程，即总线程数比数组长度小一些，让每个线程多处理一些数据
 int main(void) {
     real *h_x = (real *)malloc(M);
     for (int i = 0; i < N; i++) {
