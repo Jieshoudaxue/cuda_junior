@@ -33,7 +33,7 @@ __global__ void reduce(const real *d_x, real *d_y, const int N) {
 
     // atomicAdd 是 CUDA 提供的原子操作函数（atomic function）： atomicAdd(address, val)
     // 第一个参数是待累加变量的地址，可以是全局内存，也可以是共享内存; 第二个参数是要加的值，函数返回的是原来的值，即 old 值。
-    // 这个函数在语义上相当于：d_y[0] += s_y[0]
+    // 这个函数在语义上相当于：d_y[0] += s_y[0]，因此不需要将 grid_size 个 s_y[0] 拷贝出来再累加，就能直接获取最终的归约结果
     if (tid == 0) {
         atomicAdd(d_y, s_y[0]);
     }

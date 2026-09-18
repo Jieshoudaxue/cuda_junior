@@ -24,8 +24,7 @@ __global__ void reduce_global(real *d_x, real *d_y) {
     // 他的作用是从整个数组中，取出 BLOCK_SIZE 个元素的首地址，交由一个线程块处理
     real *x = d_x + blockDim.x * blockIdx.x;
 
-    // blockDim.x >> 1 等价于 blockDim.x / 2; offset >>= 1 等价于 offset /= 2; 
-    // 使用位运算，是因为效率比较高。
+    // blockDim.x >> 1 等价于 blockDim.x / 2; offset >>= 1 等价于 offset /= 2; 使用位运算，是因为效率比较高。
     for (int offset = blockDim.x >> 1; offset > 0; offset >>= 1) {
         // 这个判断确保随着归约的进行，越来越多的线程空闲下来
         if (tid < offset) {
@@ -37,7 +36,8 @@ __global__ void reduce_global(real *d_x, real *d_y) {
         __syncthreads();
     }
 
-    // 这个函数归约的结果，是将 N 长的数组，变为 N/BLOCK_SIZE 长的数组，而不是直接归约为 1，请注意这一点
+    // 上面的循环结束后，每个 block 所处理的数组元素和就在 x[0] 内，然后再将每个 block 的 x[0] 拷贝出来
+    // 这个函数归约的结果，是将 N 长的数组，变为 grid_size = N/BLOCK_SIZE 长的数组，而不是直接归约为 1，请注意这一点
     // 后续的逻辑会将 d_y 拷贝到主机端，使用循环完成最后的归约。
     if (tid == 0) {
         d_y[blockIdx.x] = x[0];

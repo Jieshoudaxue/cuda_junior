@@ -15,17 +15,24 @@ const int GRID_SIZE = 10240;
 
 __global__ void reduce_cooperative_group(const real *d_x, real *d_y, const int N) {
     const int tid = threadIdx.x;
-    const int bid = blockIdx.x;
-    extern __shared__ real s_y[];
 
+    // 由于总的线程数量小于数组长度，因此单个线程需要处理多个元素，又由于全局内存的合并访问限制（详情见 05_cuda_memory/memory6global.cu），
+    // 单个线程不能处理连续的数组元素，而连续的线程必须处理连续的数组元素，因此合理的方案就是设置跨步，即 stride，这里将 stride 设置为总的线程数。
+    // 每个线程将自己处理的数组元素累加到寄存器 y 中，然后再将寄存器 y 拷贝到当前线程 id 对应的共享内存中，准备进行归约计算。
     real y = 0.0;
     const int stride = blockDim.x * gridDim.x;
-    for (int i = bid * blockDim.x + tid; i < N; i += stride) {
+    for (int i = blockIdx.x * blockDim.x + tid; i < N; i += stride) {
         y += d_x[i];
     }
+    // 共享内存属于线程块（详见 05_cuda_memory/memory4shared.cu），每个线程块有自己的共享内存副本，
+    // 因此，这里的 s_y 不是长度为总线程数（GRID_SIZE × BLOCK_SIZE）的长数组，而是 GRID_SIZE 个独立的长度为 BLOCK_SIZE 的短数组。
+    // 这一步做完，相当于完成了 08_thread_wrap_sync/reduce.cu 中的： s_y[tid] = (n < N) ? d_x[n] : 0.0; 
+    // 数据从全局内存，稍加处理后，放入了共享内存中。
+    extern __shared__ real s_y[];
     s_y[tid] = y;
     __syncthreads();
 
+    // blockDim.x 就是 BLOCK_SIZE，当 offset 大于等于 32 时，下面的执行语句需要在线程块内部进行同步，因此使用 __syncthreads()
     for (int offset = blockDim.x >> 1; offset >= 32; offset >>= 1) {
         if (tid < offset) {
             s_y[tid] += s_y[tid + offset];
@@ -33,15 +40,17 @@ __global__ void reduce_cooperative_group(const real *d_x, real *d_y, const int N
         __syncthreads();
     }
 
+    // 对于最后要处理的 32 个数据，他们由一个线程束负责，每一个线程将自己要处理的数组元素拷贝到寄存器中，然后进行累加处理，比直接操作共享内存效率要高
     y = s_y[tid];
-
+    // 使用协作组，在线程束内部完成最后 32 个数据的计算
+    // 下面的写法，可以理解为将 32 长的数组，连续向左平移 16, 8, 4, 2, 1， 每次平移都与当前值累加，最终零号线程的 y 值就是归约的最终结果。
     cooperative_groups::thread_block_tile<32> cg = cooperative_groups::tiled_partition<32>(cooperative_groups::this_thread_block());
     for (int i = cg.size() >> 1; i > 0; i >>= 1) {
         y += cg.shfl_down(y, i);
     }
 
     if (tid == 0) {
-        d_y[bid] = y;
+        d_y[blockIdx.x] = y;
     }
 }
 
@@ -53,7 +62,7 @@ real reduce(const real *d_x) {
     real *d_y;
     CHECK_CUDA_CALL(cudaMalloc(&d_y, y_mem_size));
 
-    // 这里使用了两次调用同一个核函数实现归约计算，
+    // 这里两次调用同一个核函数实现归约计算，
     // 第一次调用， GRID_SIZE 是 10240, BLOCK_SIZE 是 128，总线程数小于 N = 1e8，得到 d_y 数组，他的长度是 GRID_SIZE = 10240
     // 第二次调用，grid_size 是 1, block_size 取最大值 1024, 总线程数小于 d_y 长度 10240，得到新的 d_y 数组，第 0 个元素即为最终结果
     reduce_cooperative_group<<<GRID_SIZE, BLOCK_SIZE, shared_mem_size>>>(d_x, d_y, N);
