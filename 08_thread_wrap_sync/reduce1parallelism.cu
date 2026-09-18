@@ -40,15 +40,19 @@ __global__ void reduce_cooperative_group(const real *d_x, real *d_y, const int N
         __syncthreads();
     }
 
-    // 对于最后要处理的 32 个数据，他们由一个线程束负责，每一个线程将自己要处理的数组元素拷贝到寄存器中，然后进行累加处理，比直接操作共享内存效率要高
+    // 对于每个 block 最后要处理的 32 个数据，他们由一个线程束负责，每一个线程将自己要处理的数组元素拷贝到寄存器中，然后进行累加处理，比直接操作共享内存效率要高
     y = s_y[tid];
     // 使用协作组，在线程束内部完成最后 32 个数据的计算
-    // 下面的写法，可以理解为将 32 长的数组，连续向左平移 16, 8, 4, 2, 1， 每次平移都与当前值累加，最终零号线程的 y 值就是归约的最终结果。
+    // 下面的写法，可以理解为将 32 长的数组，连续向左平移 16, 8, 4, 2, 1， 每次平移都与当前值累加，最终 0 号线程的 y 值就是归约的最终结果。
     cooperative_groups::thread_block_tile<32> cg = cooperative_groups::tiled_partition<32>(cooperative_groups::this_thread_block());
     for (int i = cg.size() >> 1; i > 0; i >>= 1) {
         y += cg.shfl_down(y, i);
     }
 
+    // 上面的处理结束后，每个 block 所处理的数组元素和就是 y ，共 grid_size 个 y 。
+    // 这里不采用 atomicAdd 直接求和，而是将每个 block 的 y 拷贝出来。
+    // 由于这个样例是两次调用同一个核函数， 第一次的 grid_size 是 GRID_SIZE，即 GRID_SIZE 个 y，
+    // 第二次的 grid_size 是 1，因此第二次调用后得到的 y ，就是最终归约结果。
     if (tid == 0) {
         d_y[blockIdx.x] = y;
     }
