@@ -90,7 +90,8 @@ void timing(real *d_x) {
     printf("sum = %f\n", sum);
 }
 
-
+// 当前这个版本，理论上是性能最优，精度最高的数组归约实现，在我的机器上，平均耗时 10.2 ms.
+// 而最初的 CPU 版本（05_cuda_memory/reduce1cpu.cu）平均耗时为 202 ms，加速了 20 倍。
 int main(void) {
     real *h_x = (real *)malloc(M);
     for (int i = 0; i < N; i++) {
