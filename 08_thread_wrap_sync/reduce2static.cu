@@ -45,6 +45,8 @@ __global__ void reduce_cooperative_group(const real *d_x, real *d_y, const int N
     }
 }
 
+// 在 08_thread_wrap_sync/reduce1parallelism.cu 中，d_y 是动态申请的，
+// 由于当前函数被多次循环调用，而动态申请全局内存又比较耗时，因此改为使用静态全局内存，具体特性见 05_cuda_memory/memory2static.cu
 __device__ real static_y[GRID_SIZE];
 
 real reduce(const real *d_x) {

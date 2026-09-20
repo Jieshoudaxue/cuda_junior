@@ -50,9 +50,11 @@ __global__ void reduce_cooperative_group(const real *d_x, real *d_y, const int N
     }
 
     // 上面的处理结束后，每个 block 所处理的数组元素和就是 y ，共 grid_size 个 y 。
-    // 这里不采用 atomicAdd 直接求和，而是将每个 block 的 y 拷贝出来。
+    // 这里不采用 atomicAdd 直接求和，而是将每个 block 的 y 拷贝到设备内存，。
     // 由于这个样例是两次调用同一个核函数， 第一次的 grid_size 是 GRID_SIZE，即 GRID_SIZE 个 y，
     // 第二次的 grid_size 是 1，因此第二次调用后得到的 y ，就是最终归约结果。
+    // 特别提示： 之前使用原子函数直接求和，以及拷贝到主机再求和，得到的最终值为 122999999.998770。而使用两次折半求和，得到的最终值为 123000000.000000，
+    //          很明显，后者更精确，前者是有精度损失的，更具体的原因，暂时搁置。
     if (tid == 0) {
         d_y[blockIdx.x] = y;
     }
