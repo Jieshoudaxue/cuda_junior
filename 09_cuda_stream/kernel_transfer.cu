@@ -7,26 +7,26 @@ typedef float real;
 // typedef double real;
 
 const int NUM_REPEATS = 10;
-const int N1 = 1024;
-const int MAX_NUM_STREAMS = 30;
-
-const int N = N1 * MAX_NUM_STREAMS;
+const int N = 1 << 22;
 const int M = sizeof(real) * N;
-const int block_size = 128;
-const int grid_size = (N1 - 1) / block_size + 1;
+const int MAX_NUM_STREAMS = 64;
 
 cudaStream_t streams[MAX_NUM_STREAMS];
 
-__global__ void add(const real *d_x, const real *d_y, real *d_z) {
+__global__ void add(const real *x, const real *y, real *z, int N) {
     const int tid = blockDim.x * blockIdx.x + threadIdx.x;
-    if (tid < N1) {
-        for (int i = 0; i < 1e5; i++) {
-            d_z[tid] = d_x[tid] + d_y[tid];
+    if (tid < N) {
+        for (int i = 0; i < 40; i ++) {
+            z[tid] = x[tid] + y[tid];
         }
     }
 }
 
-void timing(const real *d_x, const real *d_y, real *d_z, const int num) {
+void timing(const real *h_x, const real *h_y, real *h_z,
+            real *d_x, real *d_y, real *d_z, const int num) {
+    int N1 = N / num;
+    int M1 = M / num;
+
     float t_sum = 0;
     float t2_sum = 0;
 
@@ -39,7 +39,14 @@ void timing(const real *d_x, const real *d_y, real *d_z, const int num) {
 
         for (int i = 0; i < num; i ++) {
             int offset = i * N1;
-            add<<<grid_size, block_size, 0, streams[i]>>>(d_x + offset, d_y + offset, d_z + offset);
+            CHECK_CUDA_CALL(cudaMemcpyAsync(d_x + offset, h_x + offset, M1, cudaMemcpyHostToDevice, streams[i]));
+            CHECK_CUDA_CALL(cudaMemcpyAsync(d_y + offset, h_y + offset, M1, cudaMemcpyHostToDevice, streams[i]));
+            
+            int block_size = 128;
+            int grid_size = (N1 - 1) / block_size + 1;
+            add<<<grid_size, block_size, 0, streams[i]>>>(d_x + offset, d_y + offset, d_z + offset, N1);
+
+            CHECK_CUDA_CALL(cudaMemcpyAsync(h_z + offset, d_z + offset, M1, cudaMemcpyDeviceToHost, streams[i]));
         }
 
         CHECK_CUDA_CALL(cudaEventRecord(stop));
@@ -62,10 +69,11 @@ void timing(const real *d_x, const real *d_y, real *d_z, const int num) {
     printf("Time = %g +- %g ms.\n", t_ave, t_err);
 }
 
-
 int main(void) {
-    real *h_x = (real *)malloc(M);
-    real *h_y = (real *)malloc(M);
+    real *h_x, *h_y, *h_z;
+    CHECK_CUDA_CALL(cudaMallocHost(&h_x, M));
+    CHECK_CUDA_CALL(cudaMallocHost(&h_y, M));
+    CHECK_CUDA_CALL(cudaMallocHost(&h_z, M));
     for (int i = 0; i < N; i ++) {
         h_x[i] = 1.23;
         h_y[i] = 2.34;
@@ -76,23 +84,22 @@ int main(void) {
     CHECK_CUDA_CALL(cudaMalloc(&d_y, M));
     CHECK_CUDA_CALL(cudaMalloc(&d_z, M));
 
-    CHECK_CUDA_CALL(cudaMemcpy(d_x, h_x, M, cudaMemcpyHostToDevice));
-    CHECK_CUDA_CALL(cudaMemcpy(d_x, h_x, M, cudaMemcpyHostToDevice));
-    
     for (int i = 0; i < MAX_NUM_STREAMS; i++) {
         CHECK_CUDA_CALL(cudaStreamCreate(&streams[i]));
     }
 
-    for (int i = 1; i <= MAX_NUM_STREAMS; i++) {
-        timing(d_x, d_y, d_z, i);
+    for (int i = 1; i <= MAX_NUM_STREAMS; i *= 2) {
+        timing(h_x, h_y, h_z, d_x, d_y, d_z, i);
     }
 
-    for (int i = 0; i < MAX_NUM_STREAMS; i++) {
+    for (int i = 0; i < MAX_NUM_STREAMS; i ++) {
         CHECK_CUDA_CALL(cudaStreamDestroy(streams[i]));
     }
 
-    free(h_x);
-    free(h_y);
+
+    CHECK_CUDA_CALL(cudaFreeHost(h_x));
+    CHECK_CUDA_CALL(cudaFreeHost(h_y));
+    CHECK_CUDA_CALL(cudaFreeHost(h_z));
     CHECK_CUDA_CALL(cudaFree(d_x));
     CHECK_CUDA_CALL(cudaFree(d_y));
     CHECK_CUDA_CALL(cudaFree(d_z));
