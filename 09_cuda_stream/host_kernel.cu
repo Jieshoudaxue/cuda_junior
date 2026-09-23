@@ -58,7 +58,7 @@ void timing(const real *h_x, const real *h_y, real *h_z,
                 break;
             case GPU_CPU_OVERLAP:
                 // 如果 cpu 计算在 gpu 之后调用，由于核函数的启动是异步的，也叫非阻塞的，即主机调用 gpu_sum 后，不会等待核函数执行完毕，可以立即做别的事情。
-                // 由于 cpu 和 gpu 同时计算，即 overlap ，此时 cpu 计算的时间被 gpu 计算的时间遮盖了一部分。因此，利用 overlap，可以对程序进行加速。
+                // 因此，cpu 和 gpu 同时计算，即 overlap ，两者的时间就会有一定的重叠。利用这个特性，可以对程序进行加速。
                 // 在这里例子中，gpu_sum 耗时大概是 16.2 ms, cpu_sum 耗时是 12.2 ms，这里的总时间是 16.2 ms，即 cpu 耗时被 gpu 耗时完全遮盖。
                 gpu_sum<<<grid_size, block_size>>>(d_x, d_y, d_z);
                 cpu_sum(h_x, h_y, h_z);
