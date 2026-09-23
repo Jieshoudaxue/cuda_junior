@@ -1,5 +1,6 @@
 #include <cmath>
 #include <cstdlib>
+#include <cstdint>
 
 #include "cuda_error.cuh"
 
@@ -12,8 +13,15 @@ const int M = sizeof(real) * N;
 const int block_size = 128;
 const int grid_size = (N - 1)/block_size + 1;
 
-void cpu_sum(const real *x, const real *y, real *z, const int N_host) {
-    for (int i = 0; i < N_host; i++) {
+enum OverlapMode : uint8_t {
+    GPU_ONLY,
+    CPU_GPU,
+    GPU_CPU_OVERLAP
+};
+
+void cpu_sum(const real *x, const real *y, real *z) {
+    int new_n = N / 20;
+    for (int i = 0; i < new_n; i++) {
         z[i] = x[i] + y[i];
     }
 }
@@ -27,7 +35,7 @@ __global__ void gpu_sum(const real *x, const real *y, real *z) {
 
 void timing(const real *h_x, const real *h_y, real *h_z, 
             const real *d_x, const real *d_y, real *d_z,
-            const int ratio, bool overlap) {
+            OverlapMode mode) {
     float t_sum = 0;
     float t2_sum = 0;
 
@@ -38,13 +46,25 @@ void timing(const real *h_x, const real *h_y, real *h_z,
         CHECK_CUDA_CALL(cudaEventRecord(start));
         cudaEventQuery(start);
 
-        if (!overlap) {
-            cpu_sum(h_x, h_y, h_z, N/ratio);
-        }
-        gpu_sum<<<grid_size, block_size>>>(d_x, d_y, d_z);
-
-        if (overlap) {
-            cpu_sum(h_x, h_y, h_z, N/ratio);
+        switch (mode) {
+            case GPU_ONLY:
+                gpu_sum<<<grid_size, block_size>>>(d_x, d_y, d_z);
+                break;
+            case CPU_GPU:
+                // 如果 cpu 计算在 gpu 之前调用，由于程序是顺序执行的，因此时间是两者之和，
+                // 在这里例子中，gpu_sum 耗时大概是 16.2 ms, cpu_sum 耗时是 12.2 ms，这里的总时间是 28.4 ms
+                cpu_sum(h_x, h_y, h_z);
+                gpu_sum<<<grid_size, block_size>>>(d_x, d_y, d_z);
+                break;
+            case GPU_CPU_OVERLAP:
+                // 如果 cpu 计算在 gpu 之后调用，由于核函数的启动是异步的，也叫非阻塞的，即主机调用 gpu_sum 后，不会等待核函数执行完毕，可以立即做别的事情。
+                // 由于 cpu 和 gpu 同时计算，即 overlap ，此时 cpu 计算的时间被 gpu 计算的时间遮盖了一部分。因此，利用 overlap，可以对程序进行加速。
+                // 在这里例子中，gpu_sum 耗时大概是 16.2 ms, cpu_sum 耗时是 12.2 ms，这里的总时间是 16.2 ms，即 cpu 耗时被 gpu 耗时完全遮盖。
+                gpu_sum<<<grid_size, block_size>>>(d_x, d_y, d_z);
+                cpu_sum(h_x, h_y, h_z);
+                break;
+            default:
+                break;
         }
 
         CHECK_CUDA_CALL(cudaEventRecord(stop));
@@ -85,20 +105,14 @@ int main(void) {
     CHECK_CUDA_CALL(cudaMemcpy(d_x, h_x, M, cudaMemcpyHostToDevice));
     CHECK_CUDA_CALL(cudaMemcpy(d_y, h_y, M, cudaMemcpyHostToDevice));
 
-    printf("without cpu-gpu overlap(ratio = 10)\n");
-    timing(h_x, h_y, h_z, d_x, d_y, d_z, 10, false);
-    printf("with cpu-gpu overlap(ratio = 10)\n");
-    timing(h_x, h_y, h_z, d_x, d_y, d_z, 10, true);
+    printf("GPU ONLY\n");
+    timing(h_x, h_y, h_z, d_x, d_y, d_z, GPU_ONLY);
+    
+    printf("cpu-gpu, no overlap\n");
+    timing(h_x, h_y, h_z, d_x, d_y, d_z, CPU_GPU);
 
-    printf("without cpu-gpu overlap(ratio = 1)\n");
-    timing(h_x, h_y, h_z, d_x, d_y, d_z, 1, false);
-    printf("with cpu-gpu overlap(ratio = 1)\n");
-    timing(h_x, h_y, h_z, d_x, d_y, d_z, 1, true);
-
-    printf("without cpu-gpu overlap(ratio = 1000)\n");
-    timing(h_x, h_y, h_z, d_x, d_y, d_z, 1000, false);
-    printf("with cpu-gpu overlap(ratio = 1000)\n");
-    timing(h_x, h_y, h_z, d_x, d_y, d_z, 1000, true);
+    printf("gpu-cpu, overlap\n");
+    timing(h_x, h_y, h_z, d_x, d_y, d_z, GPU_CPU_OVERLAP);
 
     free(h_x);
     free(h_y);
