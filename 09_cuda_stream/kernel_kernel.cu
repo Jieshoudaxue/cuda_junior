@@ -8,7 +8,7 @@ typedef float real;
 
 const int NUM_REPEATS = 10;
 const int N1 = 1024;
-const int MAX_NUM_STREAMS = 30;
+const int MAX_NUM_STREAMS = 11;
 
 const int N = N1 * MAX_NUM_STREAMS;
 const int M = sizeof(real) * N;
@@ -20,13 +20,14 @@ cudaStream_t streams[MAX_NUM_STREAMS];
 __global__ void add(const real *d_x, const real *d_y, real *d_z) {
     const int tid = blockDim.x * blockIdx.x + threadIdx.x;
     if (tid < N1) {
-        for (int i = 0; i < 1e5; i++) {
+        // 提示：这里的循环只是为了增加耗时
+        for (int i = 0; i < 1e6; ++i) {
             d_z[tid] = d_x[tid] + d_y[tid];
         }
     }
 }
 
-void timing(const real *d_x, const real *d_y, real *d_z, const int num) {
+void timing(const real *d_x, const real *d_y, real *d_z) {
     float t_sum = 0;
     float t2_sum = 0;
 
@@ -37,8 +38,17 @@ void timing(const real *d_x, const real *d_y, real *d_z, const int num) {
         CHECK_CUDA_CALL(cudaEventRecord(start));
         cudaEventQuery(start);
 
-        for (int i = 0; i < num; i ++) {
+        for (int i = 0; i < MAX_NUM_STREAMS; i++) {
             int offset = i * N1;
+            // CUDA 核函数有且只有三种调用方式，分别如下：
+            // 1. kernel<<<grid_size, block_size>>>(args...);
+            // 2. kernel<<<grid_size, block_size, shared_mem_size>>>(args...);
+            // 3. kernel<<<grid_size, block_size, shared_mem_size, stream>>>(args...);
+            // 下面的写法是错误的，请注意：
+            // kernel<<<grid_size, block_size, stream>>>(args...);
+
+            // d_x, d_y, d_z 是长度为 N 的数组，N = N1 * MAX_NUM_STREAMS
+            // MAX_NUM_STREAMS 个非空流各自处理 N1 长度的数据元素
             add<<<grid_size, block_size, 0, streams[i]>>>(d_x + offset, d_y + offset, d_z + offset);
         }
 
@@ -63,6 +73,11 @@ void timing(const real *d_x, const real *d_y, real *d_z, const int num) {
 }
 
 
+// 一个 CUDA 流指的是由主机发出的在一个设备中执行的 CUDA 操作序列，如主机－设备数据传输和核函数执行。
+// 一个 CUDA 流中各个操作的次序是由主机控制的，按照主机发布的次序执行，而且同一个 CUDA 流中的所有 CUDA 操作都是顺序执行的。
+// 然而，来自于两个不同 CUDA 流中的操作不一定按照某个次序执行，而有可能并发或交错地执行。
+// 任何 CUDA 操作都存在于某个 CUDA 流中，要么是默认流（default stream），也称为空流（null stream），要么是明确指定的非空流，非空流由主机端负责创建和销毁。
+// 前面几章所有的样例，包括本目录的 09_cuda_stream/host_kernel.cu，使用的都是默认流。而本样例将演示非空流的创建和销毁
 int main(void) {
     real *h_x = (real *)malloc(M);
     real *h_y = (real *)malloc(M);
@@ -80,12 +95,21 @@ int main(void) {
     CHECK_CUDA_CALL(cudaMemcpy(d_x, h_x, M, cudaMemcpyHostToDevice));
     
     for (int i = 0; i < MAX_NUM_STREAMS; i++) {
+        // 一个 CUDA 流由类型为 cudaStream_t 的变量表示，由 CUDA 运行时 API 函数创建和销毁，两个函数签名如下：
+        // cudaError_t cudaStreamCreate(cudaStream_t*);
+        // cudaError_t cudaStreamDestroy(cudaStream_t);
+        // 一个典型的非空流的创建和销毁过程如下：
+        // cudaStream_t stream;
+        // cudaStreamCreate(&stream);
+        // ...
+        // cudaStreamDestroy(stream);
+
+        // 本样例中，streams 是一个全局变量，类型为 cudaStream_t 数组: cudaStream_t streams[MAX_NUM_STREAMS];
+        // 这里创建了 MAX_NUM_STREAMS 个非空流
         CHECK_CUDA_CALL(cudaStreamCreate(&streams[i]));
     }
 
-    for (int i = 1; i <= MAX_NUM_STREAMS; i++) {
-        timing(d_x, d_y, d_z, i);
-    }
+    timing(d_x, d_y, d_z);
 
     for (int i = 0; i < MAX_NUM_STREAMS; i++) {
         CHECK_CUDA_CALL(cudaStreamDestroy(streams[i]));
