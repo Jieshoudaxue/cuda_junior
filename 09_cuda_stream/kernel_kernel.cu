@@ -72,12 +72,8 @@ void timing(const real *d_x, const real *d_y, real *d_z, const int num) {
     printf("Time = %g +- %g ms.\n", t_ave, t_err);
 }
 
-
-// 一个 CUDA 流指的是由主机发出的在一个设备中执行的 CUDA 操作序列，如主机－设备数据传输和核函数执行。
-// 一个 CUDA 流中各个操作的次序是由主机控制的，按照主机发布的次序执行，而且同一个 CUDA 流中的所有 CUDA 操作都是顺序执行的。
-// 然而，来自于两个不同 CUDA 流中的操作不一定按照某个次序执行，而有可能并发或交错地执行。
-// 任何 CUDA 操作都存在于某个 CUDA 流中，要么是默认流（default stream），也称为空流（null stream），要么是明确指定的非空流，非空流由主机端负责创建和销毁。
-// 前面几章所有的样例，包括本目录的 09_cuda_stream/host_kernel.cu，使用的都是默认流。而本样例将演示非空流的创建和销毁
+// 背景见： 09_cuda_stream/add.cu 里的注释
+// 本样例将介绍非空流的创建和销毁，并演示第二种任务级别的并行：不同次调用的核函数之间的并行
 int main(void) {
     real *h_x = (real *)malloc(M);
     real *h_y = (real *)malloc(M);

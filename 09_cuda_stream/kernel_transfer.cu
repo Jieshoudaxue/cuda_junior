@@ -9,7 +9,7 @@ typedef float real;
 const int NUM_REPEATS = 10;
 const int N = 1 << 22;
 const int M = sizeof(real) * N;
-const int MAX_NUM_STREAMS = 64;
+const int MAX_NUM_STREAMS = 15;
 
 cudaStream_t streams[MAX_NUM_STREAMS];
 
@@ -69,6 +69,7 @@ void timing(const real *h_x, const real *h_y, real *h_z,
     printf("Time = %g +- %g ms.\n", t_ave, t_err);
 }
 
+// 09_cuda_stream/host_kernel.cu 和 09_cuda_stream/kernel_kernel.cu 
 int main(void) {
     real *h_x, *h_y, *h_z;
     CHECK_CUDA_CALL(cudaMallocHost(&h_x, M));
