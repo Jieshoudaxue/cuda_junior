@@ -8,7 +8,7 @@ typedef float real;
 
 const int NUM_REPEATS = 10;
 const int N1 = 1024;
-const int MAX_NUM_STREAMS = 11;
+const int MAX_NUM_STREAMS = 10;
 
 const int N = N1 * MAX_NUM_STREAMS;
 const int M = sizeof(real) * N;
@@ -21,13 +21,13 @@ __global__ void add(const real *d_x, const real *d_y, real *d_z) {
     const int tid = blockDim.x * blockIdx.x + threadIdx.x;
     if (tid < N1) {
         // 提示：这里的循环只是为了增加耗时
-        for (int i = 0; i < 1e6; ++i) {
+        for (int i = 0; i < 1e5; ++i) {
             d_z[tid] = d_x[tid] + d_y[tid];
         }
     }
 }
 
-void timing(const real *d_x, const real *d_y, real *d_z) {
+void timing(const real *d_x, const real *d_y, real *d_z, const int num) {
     float t_sum = 0;
     float t2_sum = 0;
 
@@ -38,7 +38,7 @@ void timing(const real *d_x, const real *d_y, real *d_z) {
         CHECK_CUDA_CALL(cudaEventRecord(start));
         cudaEventQuery(start);
 
-        for (int i = 0; i < MAX_NUM_STREAMS; i++) {
+        for (int i = 0; i < num; i++) {
             int offset = i * N1;
             // CUDA 核函数有且只有三种调用方式，分别如下：
             // 1. kernel<<<grid_size, block_size>>>(args...);
@@ -92,7 +92,7 @@ int main(void) {
     CHECK_CUDA_CALL(cudaMalloc(&d_z, M));
 
     CHECK_CUDA_CALL(cudaMemcpy(d_x, h_x, M, cudaMemcpyHostToDevice));
-    CHECK_CUDA_CALL(cudaMemcpy(d_x, h_x, M, cudaMemcpyHostToDevice));
+    CHECK_CUDA_CALL(cudaMemcpy(d_y, h_y, M, cudaMemcpyHostToDevice));
     
     for (int i = 0; i < MAX_NUM_STREAMS; i++) {
         // 一个 CUDA 流由类型为 cudaStream_t 的变量表示，由 CUDA 运行时 API 函数创建和销毁，两个函数签名如下：
@@ -109,7 +109,13 @@ int main(void) {
         CHECK_CUDA_CALL(cudaStreamCreate(&streams[i]));
     }
 
-    timing(d_x, d_y, d_z);
+    // 下面的循环演示了如何使用不同数量的非空流来执行相同的核函数 add
+    // 在我的机器上，五个以内的非空流的执行时间几乎相同，五个以上的非空流的执行时间明显增加，见 09_cuda_stream/kernel_kernel_result.txt
+    // 可见，合理的使用非空流可以加速运算，让算力充分发挥
+    for (int i = 1; i <= MAX_NUM_STREAMS; i++) {
+        printf("Timing with %d streams:\n", i);
+        timing(d_x, d_y, d_z, i);
+    }
 
     for (int i = 0; i < MAX_NUM_STREAMS; i++) {
         CHECK_CUDA_CALL(cudaStreamDestroy(streams[i]));
