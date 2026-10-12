@@ -69,7 +69,28 @@ void timing(const real *h_x, const real *h_y, real *h_z,
     printf("Time = %g +- %g ms.\n", t_ave, t_err);
 }
 
-// 09_cuda_stream/host_kernel.cu 和 09_cuda_stream/kernel_kernel.cu 
+// 这个例子我们演示第三种任务级别的并行：核函数与数据传输之间的并行
+// 09_cuda_stream/add.cu 的注释里我们提到，数据传输是同步的，也叫阻塞的，即主机调用 cudaMemcpy 后，会等待命令执行完毕再往前走。
+// 而核函数的启动是异步的，也叫非阻塞的，即主机调用 add 后，不会等待核函数执行完毕，可以立即做别的事情。
+
+// 如果要实现核函数与数据传输之间的并行，数据传输必须使用 cudaMemcpy 函数的异步版本，即 cudaMemcpyAsync 函数。
+// 他的底层由 GPU 的 DMA（direct memory access）直接实现，不需要主机参与，因此可以实现核函数与数据传输之间的并行。
+// 除了必须使用 cudaMemcpyAsync 函数外，核函数与数据传输两个操作还必须处于不同的非默认流，才能实现并行。
+
+// cudaMemcpyAsync 函数签名如下，他比 cudaMemcpy 多了一个 stream 参数，表示数据传输操作属于哪个流。
+// cudaError_t cudaMemcpyAsync(void *dst, const void *src, size_t count, enum cudaMemcpyKind kind, cudaStream_t stream = 0);
+
+// 使用 cudaMemcpyAsync 函数时，还有一个要求，即主机内存必须使用 cudaMallocHost 或 cudaHostAlloc 函数分配，而不是使用 malloc 直接分配。
+// 使用 cudaMallocHost 或 cudaHostAlloc 函数分配的主机内存是不可分页内存（non-pageablememory）或者固定内存（pinned memory），其在程序运行期间，其物理地址将保持不变，
+// 使用 malloc 分配的主机内存是可分页内存（pageable memory），其在程序运行期间，其物理地址有可能被操作系统改变，
+// 如果给 cudaMemcpyAsync 传入可分页内存，CUDA 驱动会隐式地将其暂存到不可分页内存，从而使异步调用退化为同步行为，因此只有不可分页内存才能实现核函数与数据传输之间的并行，
+
+// cudaMallocHost 或 cudaHostAlloc 函数签名如下，本样例我们只使用 cudaMallocHost 函数：
+// cudaError_t cudaMallocHost(void** ptr, size_t size);
+// cudaError_t cudaHostAlloc(void** ptr, size_t size, unsigned int flags);
+// 对应的释放函数签名如下:
+// cudaError_t cudaFreeHost(void* ptr);
+
 int main(void) {
     real *h_x, *h_y, *h_z;
     CHECK_CUDA_CALL(cudaMallocHost(&h_x, M));
