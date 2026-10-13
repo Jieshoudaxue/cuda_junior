@@ -9,16 +9,14 @@ typedef float real;
 const int NUM_REPEATS = 10;
 const int N = 1 << 22;
 const int M = sizeof(real) * N;
-const int MAX_NUM_STREAMS = 15;
+const int MAX_NUM_STREAMS = 10;
 
 cudaStream_t streams[MAX_NUM_STREAMS];
 
 __global__ void add(const real *x, const real *y, real *z, int N) {
     const int tid = blockDim.x * blockIdx.x + threadIdx.x;
     if (tid < N) {
-        for (int i = 0; i < 40; i ++) {
-            z[tid] = x[tid] + y[tid];
-        }
+        z[tid] = x[tid] + y[tid];
     }
 }
 
@@ -90,7 +88,6 @@ void timing(const real *h_x, const real *h_y, real *h_z,
 // cudaError_t cudaHostAlloc(void** ptr, size_t size, unsigned int flags);
 // 对应的释放函数签名如下:
 // cudaError_t cudaFreeHost(void* ptr);
-
 int main(void) {
     real *h_x, *h_y, *h_z;
     CHECK_CUDA_CALL(cudaMallocHost(&h_x, M));
@@ -110,7 +107,20 @@ int main(void) {
         CHECK_CUDA_CALL(cudaStreamCreate(&streams[i]));
     }
 
-    for (int i = 1; i <= MAX_NUM_STREAMS; i *= 2) {
+    // 在这个例子中，程序要处理 1<<22 固定长度的数组求和计算，通常情况下，处理逻辑是先拷贝到设备，然后在设备上执行核函数，最后再拷贝回主机，这三个操作是串行的，无法并行化。
+    // 三个环节中，从主机到设备的数据传输是最慢的，细节参考博客：https://blog.csdn.net/cy1641395022/article/details/163591448 。
+    // 本样例中，我们将数组分成 MAX_NUM_STREAMS 份，每份长度为 N1 = N / MAX_NUM_STREAMS，使用 MAX_NUM_STREAMS 个非空流来处理这 MAX_NUM_STREAMS 份数据，
+    // 每个非空流内部串行处理 N1 长度的数据元素，而不同非空流之间是并行的，这样就实现了核函数与数据传输之间的并行，
+    // 而实现核函数与数据传输之间的并行，可以减少数据传输的等待时间，从而加速计算。效果如下（H2D： 主机到设备，KER： 核函数，D2H： 设备到主机）：
+    // Stream 1：H2D -> KER -> D2H
+    // Stream 2：       H2D -> KER -> D2H
+    // Stream 3：              H2D -> KER -> D2H
+    // Stream 4：                      H2D -> KER -> D2H
+    
+    // 在我的机器上，五个以内的非空流的执行时间是逐步减少的，五个以上的非空流的执行时间几乎不变，见 09_cuda_stream/kernel_transfer_result.txt,
+    // 这说明，使用多个非空流实现核函数与数据传输之间的并行，可以加速计算，让算力充分发挥。
+    for (int i = 1; i <= MAX_NUM_STREAMS; i++) {
+        printf("Using %d streams:\n", i);
         timing(h_x, h_y, h_z, d_x, d_y, d_z, i);
     }
 
