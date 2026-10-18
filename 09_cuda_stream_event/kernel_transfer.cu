@@ -9,7 +9,7 @@ typedef float real;
 const int NUM_REPEATS = 10;
 const int N = 1 << 22;
 const int M = sizeof(real) * N;
-const int MAX_NUM_STREAMS = 10;
+const int MAX_NUM_STREAMS = 64;
 
 cudaStream_t streams[MAX_NUM_STREAMS];
 
@@ -119,7 +119,8 @@ int main(void) {
     
     // 在我的机器上，五个以内的非空流的执行时间是逐步减少的，五个以上的非空流的执行时间几乎不变，见 09_cuda_stream/kernel_transfer_result.txt,
     // 这说明，使用多个非空流实现核函数与数据传输之间的并行，可以加速计算，让算力充分发挥。
-    for (int i = 1; i <= MAX_NUM_STREAMS; i++) {
+    // 提示：这里 i *= 2 是为了让 N 能整除 i，避免存在尾部数据处理不当问题
+    for (int i = 1; i <= MAX_NUM_STREAMS; i*= 2) {
         printf("Using %d streams:\n", i);
         timing(h_x, h_y, h_z, d_x, d_y, d_z, i);
     }

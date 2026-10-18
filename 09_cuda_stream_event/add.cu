@@ -35,9 +35,9 @@ void check(const double *pz, const int N) {
 // 4. 主机计算与数据传输之间的并行
 // 5. 不同的数据传输之间的并行 
 // 任务间的并行使用 cuda stream 实现，如果任务间没有依赖关系，就不需要进行流同步，比如数组相加的例子。如果有依赖关系，就需要进行流同步。主要有以下两种方式
-// 1. 跨 stream 依赖：用 Event（cudaEventRecord + cudaStreamWaitEvent），可以让一个 Stream 等待另一个 Stream 中的某个操作完成，而不必阻塞整个主机线程，是任务级并行的核心。 
-// 2. 主机等待 stream 完成：用 cudaError_t cudaStreamSynchronize(cudaStream_t stream) ，阻塞主机直到该 stream 所有操作完成。 
+// 1. 主机等待 stream 完成：用 cudaError_t cudaStreamSynchronize(cudaStream_t stream) ，阻塞主机直到该 stream 所有操作完成。 
 //    cudaError_t cudaStreamQuery(cudaStream_t stream); ，不阻塞主机，只检查 CUDA 流 stream 中的所有操作是否都执行完毕。
+// 2. 跨 stream 依赖：用 Event（cudaEventRecord + cudaStreamWaitEvent），可以让一个 Stream 等待另一个 Stream 中的某个操作完成，而不必阻塞整个主机线程，是任务级并行的核心。 
 
 // 一个 CUDA 流指的是由主机发出的在一个设备中执行的 CUDA 操作序列，如主机－设备数据传输和核函数执行。
 // 一个 CUDA 流中各个操作的次序是由主机控制的，按照主机发布的次序执行，而且同一个 CUDA 流中的所有 CUDA 操作都是顺序执行的，而两个不同 CUDA 流中的操作可以并发执行。
