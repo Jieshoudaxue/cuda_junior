@@ -73,7 +73,7 @@ void timing(const real *d_x, const real *d_y, real *d_z, const int num) {
 }
 
 // 背景见： 09_cuda_stream/add.cu 里的注释
-// 本样例将介绍非空流的创建和销毁，并演示第二种任务级别的并行：不同次调用的核函数之间的并行
+// 本样例将介绍非空流的创建和销毁，并演示任务级别的并行第二种：不同次调用的核函数之间的并行
 int main(void) {
     real *h_x = (real *)malloc(M);
     real *h_y = (real *)malloc(M);
