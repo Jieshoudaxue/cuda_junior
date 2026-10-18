@@ -8,9 +8,9 @@ typedef float real;
 
 const int N = 1 << 22;
 const int M = sizeof(real) * N;
-const int MAX_NUM_STREAMS = 64;
+const int NUM_STREAMS = 8;
 
-cudaStream_t streams[MAX_NUM_STREAMS];
+cudaStream_t streams[NUM_STREAMS];
 
 __global__ void add(const real *x, const real *y, real *z, int N) {
     const int tid = blockDim.x * blockIdx.x + threadIdx.x;
@@ -46,37 +46,35 @@ int main(void) {
     CHECK_CUDA_CALL(cudaMalloc(&d_y, M));
     CHECK_CUDA_CALL(cudaMalloc(&d_z, M));
 
-    for (int i = 0; i < MAX_NUM_STREAMS; i++) {
+    for (int i = 0; i < NUM_STREAMS; i++) {
         CHECK_CUDA_CALL(cudaStreamCreate(&streams[i]));
     }
 
-    for (int num = 1; num <= MAX_NUM_STREAMS; num *= 2) {
-        printf("Using %d streams:\n", num);
+    printf("Using %d streams:\n", NUM_STREAMS);
 
-        int N1 = N / num;
-        int M1 = M / num;
-        for (int i = 0; i < num; i++) {
-            int offset = i * N1;
-            CHECK_CUDA_CALL(cudaMemcpyAsync(d_x + offset, h_x + offset, M1, cudaMemcpyHostToDevice, streams[i]));
-            CHECK_CUDA_CALL(cudaMemcpyAsync(d_y + offset, h_y + offset, M1, cudaMemcpyHostToDevice, streams[i]));
+    int N1 = N / NUM_STREAMS;
+    int M1 = M / NUM_STREAMS;
+    for (int i = 0; i < NUM_STREAMS; i++) {
+        int offset = i * N1;
+        CHECK_CUDA_CALL(cudaMemcpyAsync(d_x + offset, h_x + offset, M1, cudaMemcpyHostToDevice, streams[i]));
+        CHECK_CUDA_CALL(cudaMemcpyAsync(d_y + offset, h_y + offset, M1, cudaMemcpyHostToDevice, streams[i]));
 
-            int block_size = 128;
-            int grid_size = (N1 - 1) / block_size + 1;
-            add<<<grid_size, block_size, 0, streams[i]>>>(d_x + offset, d_y + offset, d_z + offset, N1);
+        int block_size = 128;
+        int grid_size = (N1 - 1) / block_size + 1;
+        add<<<grid_size, block_size, 0, streams[i]>>>(d_x + offset, d_y + offset, d_z + offset, N1);
 
-            CHECK_CUDA_CALL(cudaMemcpyAsync(h_z + offset, d_z + offset, M1, cudaMemcpyDeviceToHost, streams[i]));
-        }
-
-        // 这里演示流同步第一种之主机等待 stream 完成： 
-        // 由于所有的数据传输和核函数执行都是在非空流中进行的，如果主机要对最终结果进行检查，就必须等待所有的 stream 完成操作。
-        // 这里主机调用 cudaStreamSynchronize(streams[i]) 阻塞主机直到所有 stream 完成操作，然后主机才对结果进行检查，此时检查结果就是正确的。
-        for (int i = 0; i < num; ++i) {
-            CHECK_CUDA_CALL(cudaStreamSynchronize(streams[i]));
-        }
-        check(h_z, N);
+        CHECK_CUDA_CALL(cudaMemcpyAsync(h_z + offset, d_z + offset, M1, cudaMemcpyDeviceToHost, streams[i]));
     }
 
-    for (int i = 0; i < MAX_NUM_STREAMS; i ++) {
+    // 这里演示流同步第一种之主机等待 stream 完成： 
+    // 由于所有的数据传输和核函数执行都是在非空流中进行的，如果主机要对最终结果进行检查，就必须等待所有的 stream 完成操作。
+    // 这里主机调用 cudaStreamSynchronize(streams[i]) 阻塞主机直到所有 stream 完成操作，然后主机才对结果进行检查，此时检查结果就是正确的。
+    for (int i = 0; i < NUM_STREAMS; ++i) {
+        CHECK_CUDA_CALL(cudaStreamSynchronize(streams[i]));
+    }
+    check(h_z, N);
+
+    for (int i = 0; i < NUM_STREAMS; i ++) {
         CHECK_CUDA_CALL(cudaStreamDestroy(streams[i]));
     }
 
