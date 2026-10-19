@@ -37,6 +37,8 @@ void check(const real *h_z, const int N) {
 // 这个例子我们演示流同步第二种之跨 stream 依赖： 
 // 使用 Cuda Event（cudaEventRecord + cudaStreamWaitEvent），可以让一个 Stream 等待另一个 Stream 中的某个操作完成，而不必阻塞整个主机线程。
 // CUDA Event 是一种将标记插入 CUDA 流的机制，可用于跟踪流中任务的进度。
+// cudaEventRecord 将事件插入流中，表示当流中的所有操作完成后，事件就会被触发。
+// cudaStreamWaitEvent 让一个流等待另一个流中的某个事件完成后才会执行，表示跨 stream 依赖。
 int main(void) {
     real *h_x, *h_y, *h_z;
     CHECK_CUDA_CALL(cudaMallocHost(&h_x, M));
@@ -62,9 +64,6 @@ int main(void) {
 
     printf("Using %d streams:\n", NUM_STREAMS);
 
-    // 这里我们演示跨 stream 依赖：用 Event（cudaEventRecord + cudaStreamWaitEvent），可以让一个 Stream 等待另一个 Stream 中的某个操作完成，而不必阻塞整个主机线程，
-    // cudaEventRecord 将事件插入流中，表示当流中的所有操作完成后，事件就会被触发。
-    // cudaStreamWaitEvent 让一个流等待另一个流中的某个事件完成后才会执行，表示跨 stream 依赖。
     // 我们将数组分成 NUM_STREAMS 份，每份 N1 个元素，每份 M1 字节, 每个流负责处理自己这一份的 H2D、KER 操作，以及上一份数据的 D2H 拷贝操作，
     // 于是当前流的 D2H 拷贝操作就依赖于上一个流的 H2D、KER 操作，这样就形成了一个环形依赖关系。
     // 为了实现跨 stream 依赖，我们创建两个事件，kernel_done[i] 和 copy_done[i] 事件，具体解释如下：
