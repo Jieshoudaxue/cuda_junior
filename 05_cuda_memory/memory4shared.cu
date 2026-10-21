@@ -18,7 +18,12 @@ __global__ void my_kernel() {
     int tid = threadIdx.x;
     shared_data[tid] = bid * 100 + tid;
 
-    // 同步同一个Block的线程
+    // __syncthreads 用于同步单个线程块里的线程，只能用于核函数（也包括被核函数调用的设备函数），
+    // __syncthreads 提供的是一个屏障（barrier）：
+    // 1. 当线程块中的所有线程都执行到 __syncthreads() 时，才会继续往下执行。先到的线程会等待后到的线程。
+    // 2. 在屏障之前，每个线程执行的语句（尤其是对共享/全局内存的写）必须完成，才能让任何线程越过屏障。
+    // 即屏障之前的工作全部完成 → 所有线程汇合 → 屏障之后的工作才开始。 这就是"排队"的精确含义。
+    // 在这里，__syncthreads 用来确保拷贝过程不被干扰，一般来说，在利用共享内存中的数据之前，都要进行线程块内的同步操作，以确保共享内存数组中的所有元素都已经更新完毕。
     __syncthreads();
 
     printf("block %d, thread %d: %d\n", bid, tid, shared_data[tid]);
