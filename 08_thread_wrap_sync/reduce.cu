@@ -37,6 +37,13 @@ __global__ void reduce_syncwarp(const real *d_x, real *d_y) {
         if (tid < offset) {
             s_y[tid] += s_y[tid + offset];
         }
+
+        // 在更小的线程束范围内，CUDA 提供了一个更轻量的同步函数 __syncwarp。
+        // 与 __syncthreads 类似，__syncwarp 也是提供一个屏障，作用范围是线程束。
+        // 1 当线程束中的所有线程都执行到 __syncwarp() 时，才会继续往下执行。先到的线程会等待后到的线程。
+        // 2. 在屏障之前，每个线程执行的语句（尤其是对共享/全局内存的写）必须完成，才能让任何线程越过屏障。
+        // 即屏障之前的工作全部完成 → 所有线程汇合 → 屏障之后的工作才开始。
+        
         // 函数原型： void __syncwarp(unsigned mask = 0xffffffff)
         // mask 是可选参数，用于控制线程束内哪些线程参与同步，默认值是 32 个 1，即全部参加同步
         // 如果 mask 是 0xfffffffe ，则 0 号线程不参与同步。
@@ -48,7 +55,7 @@ __global__ void reduce_syncwarp(const real *d_x, real *d_y) {
     }
 }
 
-// 利用线程束洗盘函数，再次优化数组归约
+// 利用线程束洗牌函数，再次优化数组归约
 __global__ void reduce_shfl(const real *d_x, real *d_y) {
     const int tid = threadIdx.x;
     const int n = blockIdx.x * blockDim.x + tid;

@@ -120,7 +120,7 @@ __global__ void test_warp_primitives(void) {
     // T __shfl_up_sync(unsigned mask, T var, unsigned delta, int width = warpSize);
     // __shfl_up_sync 的作用是让指定范围 [0, width-1] 的所有线程，都从比自己小 delta 的线程中获取 var 并返回，即小 ID 的线程将 var 上移
     // delta 用于计算 srcLane， srcLane = curLane - delta, curLane 代表 [0, width-1] 内的某一个线程
-    // 如果 srcLane < 0, 即越过了所在子段的左边界，则返回值就是调用者自己的 var。
+    // 如果 srcLane < 0, 即越过了所在子段的左边界，则返回值就是调用者自己的 var，即越界返回自己。
     
     // 以这里为例，当前核函数共 16 个线程，所以参与表决的线程是 16 个。WIDTH 为 8 ，则将 16 个线程分为两段，分别洗牌。
     // 针对 [0, 7] 线程，则依次从 [0, 0, ..., 6] 线程取 var (tid) ，返回给自己。
@@ -138,7 +138,7 @@ __global__ void test_warp_primitives(void) {
     // T __shfl_down_sync(unsigned mask, T var, unsigned delta, int width = warpSize);
     // __shfl_down_sync 的作用是让指定范围 [0, width-1] 的所有线程，都从比自己大 delta 的线程中获取 var 并返回，即大 ID 的线程将 var 下移
     // delta 用于计算 srcLane， srcLane = curLane + delta, curLane 代表 [0, width-1] 内的某一个线程
-    // 如果 srcLane > width-1, 即越过了所在子段的右边界，则返回值就是调用者自己的 var。
+    // 如果 srcLane > width-1, 即越过了所在子段的右边界，则返回值就是调用者自己的 var，即越界返回自己。
 
     // 以这里为例，当前核函数共 16 个线程，所以参与表决的线程是 16 个。WIDTH 为 8 ，则将 16 个线程分为两段，分别洗牌。
     // 针对 [0, 7] 线程，则依次从 [1, ..., 7, 7] 线程取 var (tid) ，返回给自己。
@@ -154,7 +154,7 @@ __global__ void test_warp_primitives(void) {
     }
 
     // T __shfl_xor_sync(unsigned mask, T var, int laneMask, int width = warpSize);
-    // __shfl_xor_sync 的作用是让指定范围 [0, width-1] 的所有线程，从 srcLane = curLane ^ laneMask 中获取 var 并返回，实际效果是临近的线程两两交互 var。
+    // __shfl_xor_sync 的作用是让指定范围 [0, width-1] 的所有线程，从 srcLane = curLane ^ laneMask 中获取 var 并返回，实际效果是临近的线程两两交换 var。
 
     // 以这里为例，当前核函数共 16 个线程，所以参与表决的线程是 16 个。WIDTH 为 8 ，则将 16 个线程分为两段，分别洗牌。
     // 针对 [0, 7] 线程，则依次从 [1  0  3  2  5  4  7  6] 线程取 var (tid) ，返回给自己。
