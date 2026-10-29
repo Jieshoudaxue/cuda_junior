@@ -172,6 +172,8 @@ __global__ void test_warp_primitives(void) {
 
 // 这里举例讲解 线程束表决函数（warp vote functions） 和 线程束洗牌函数（warp shuffle functions），
 // 他们都以 _sync 结尾，而且都具备隐式的线程束同步功能，能自动处理数据竞争问题
+// 隐式同步的原理是硬件在执行数据交换或聚合之前，会强制等待 mask 中指定的所有线程到达同一条指令，即线程汇聚，相当于提供了屏障语义。
+// 当汇聚完成后，再读对方寄存器，而且汇聚和读取是一条指令。
 int main(void) {
     test_warp_primitives<<<1, BLOCK_SIZE>>>();
     CHECK_CUDA_CALL(cudaDeviceSynchronize());
