@@ -11,7 +11,7 @@
 
 // thrust 提供了 5 类常用算法：详情见 https://github.com/thrust/thrust/wiki
 // 1. 变换（transformation）
-// 2. 归约（reduction）
+// 2. 归约（reduction）, 前面重点讲解了归约算法实现
 // 3. 前缀和（prefix sum，也叫 scan）
 // 4. 排序（sorting）和搜索（searching）
 // 5. 重排（reordering）：选择性复制、替换、移除、分区
