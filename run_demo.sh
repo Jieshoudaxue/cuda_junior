@@ -69,10 +69,10 @@ fi
 # 我的 GPU NVIDIA GeForce MX450, CC 为 7.5，所以在编译时使用 -arch=sm_75 参数。
 # 如果不指定 -arch 参数，nvcc 会使用默认的 CC 版本进行编译，CUDA 11.4 默认的 CC 版本为 5.3
 echo "--------------------"
-echo "$compiler ${compiler_args[*]} -o $exe $src $@"
+echo "$compiler ${compiler_args[*]} "-lcublas" -o $exe $src $@"
 echo "--------------------"
 
-if ! "$compiler" "${compiler_args[@]}" -o "$exe" "$src" "$@"; then
+if ! "$compiler" "${compiler_args[@]}" "-lcublas" -o "$exe" "$src" "$@"; then
   echo "Compilation failed." >&2
   exit 4
 fi
