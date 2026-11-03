@@ -72,7 +72,7 @@ void timing(const real *d_x, const real *d_y, real *d_z, const int num) {
     printf("Time = %g +- %g ms.\n", t_ave, t_err);
 }
 
-// 背景见： 09_cuda_stream/add.cu 里的注释
+// 背景见： 10_cuda_stream/add.cu 里的注释
 // 本样例将介绍非空流的创建和销毁，并演示任务级别的并行第二种：不同次调用的核函数之间的并行
 int main(void) {
     real *h_x = (real *)malloc(M);
@@ -106,7 +106,7 @@ int main(void) {
     }
 
     // 下面的循环演示了如何使用不同数量的非空流来执行相同的核函数 add
-    // 在我的机器上，五个以内的非空流的执行时间几乎相同，即数据量增加，耗时不变; 五个以上的非空流的执行时间明显增加，见 09_cuda_stream/kernel_kernel_result.txt
+    // 在我的机器上，五个以内的非空流的执行时间几乎相同，即数据量增加，耗时不变; 五个以上的非空流的执行时间明显增加，见 10_cuda_stream/kernel_kernel_result.txt
     // 可见，合理的使用非空流可以加速运算，让算力充分发挥
     for (int i = 1; i <= MAX_NUM_STREAMS; i++) {
         printf("Timing with %d streams:\n", i);

@@ -68,7 +68,7 @@ void timing(const real *h_x, const real *h_y, real *h_z,
 }
 
 // 这个例子我们演示任务级别的并行第三种：核函数与数据传输之间的并行
-// 09_cuda_stream/add.cu 的注释里我们提到，数据传输是同步的，也叫阻塞的，即主机调用 cudaMemcpy 后，会等待命令执行完毕再往前走。
+// 10_cuda_stream/add.cu 的注释里我们提到，数据传输是同步的，也叫阻塞的，即主机调用 cudaMemcpy 后，会等待命令执行完毕再往前走。
 // 而核函数的启动是异步的，也叫非阻塞的，即主机调用 add 后，不会等待核函数执行完毕，可以立即做别的事情。
 
 // 如果要实现核函数与数据传输之间的并行，数据传输必须使用 cudaMemcpy 函数的异步版本，即 cudaMemcpyAsync 函数。
@@ -117,7 +117,7 @@ int main(void) {
     // Stream 3：              H2D -> KER -> D2H
     // Stream 4：                      H2D -> KER -> D2H
     
-    // 在我的机器上，五个以内的非空流的执行时间是逐步减少的，五个以上的非空流的执行时间几乎不变，见 09_cuda_stream/kernel_transfer_result.txt,
+    // 在我的机器上，五个以内的非空流的执行时间是逐步减少的，五个以上的非空流的执行时间几乎不变，见 10_cuda_stream/kernel_transfer_result.txt,
     // 这说明，使用多个非空流实现核函数与数据传输之间的并行，可以加速计算，让算力充分发挥。
     // 提示：这里 i *= 2 是为了让 N 能整除 i，避免存在尾部数据处理不当问题
     for (int i = 1; i <= MAX_NUM_STREAMS; i*= 2) {

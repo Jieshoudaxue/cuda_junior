@@ -87,7 +87,7 @@ void timing(const real *h_x, const real *h_y, real *h_z,
     printf("Time = %g +- %g ms.\n", t_ave, t_err);
 }
 
-// 背景见： 09_cuda_stream/add.cu 里的注释
+// 背景见： 10_cuda_stream/add.cu 里的注释
 // 这个例子我们演示任务级别的并行第一种：核函数与主机计算之间的并行 
 int main(void) {
     real *h_x = (real *)malloc(M);
