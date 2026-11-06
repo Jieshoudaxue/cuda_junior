@@ -73,7 +73,7 @@ int main(void) {
     cublasCreate(&handle);
     double alpha = 1.0;
     double beta = 0.0;
-    // gemm 指 GEneral Matrix-Matrix multiplication，即“一般的矩阵-矩阵相乘”
+    // cublasDgemm 中的 gemm 指 GEneral Matrix-Matrix multiplication，即“一般的矩阵-矩阵相乘”，D 指 double 类型
     // cublasStatus_t cublasDgemm(cublasHandle_t handle, cublasOperation_t transa, cublasOperation_t transb, int m, int n, int k, 
     //                              const double *alpha, const double *A, int lda, 
     //                              const double *B, int ldb, const double *beta, 
